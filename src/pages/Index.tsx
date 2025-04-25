@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { MessageSquare, Bell, Menu } from 'lucide-react';
 import { ChatProvider } from '@/context/ChatContext';
@@ -10,7 +11,8 @@ import { Card } from '@/components/ui/card';
 import { useChatContext } from '@/context/ChatContext';
 import { Checkbox } from '@/components/ui/checkbox';
 import { formatDate } from '@/utils/chatUtils';
-import { Bell, Calendar, Coffee } from 'lucide-react';
+// Remove the duplicate Bell import
+import { Calendar, Coffee } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
