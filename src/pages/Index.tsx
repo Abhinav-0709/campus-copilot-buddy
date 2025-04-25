@@ -1,5 +1,5 @@
-
 import React, { useState } from 'react';
+import { MessageSquare, Bell, Menu } from 'lucide-react';
 import { ChatProvider } from '@/context/ChatContext';
 import Header from '@/components/UI/Header';
 import ChatContainer from '@/components/Chat/ChatContainer';
