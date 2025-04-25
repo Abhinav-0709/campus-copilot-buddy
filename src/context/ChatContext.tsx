@@ -1,7 +1,7 @@
-
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { ChatMessage, Reminder } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
+import { useStudentData } from '@/hooks/useStudentData';
+import type { ChatMessage, Reminder } from '@/types';
 
 interface ChatContextType {
   messages: ChatMessage[];
@@ -31,23 +31,61 @@ const mockResponses: Record<string, string> = {
   forms: "Common forms you might need:\n• KYC verification\n• Scholarship application\n• Hostel extension\n• Internship certification"
 };
 
-const getResponse = (query: string): string => {
+const getPersonalizedResponse = (query: string, studentData: any[]) => {
   const lowerQuery = query.toLowerCase();
+  const greetings = ["Hi!", "Hello!", "Hey there!", "Greetings!", "Hi friend!"];
+  const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
   
-  if (lowerQuery.includes('exam')) return mockResponses.exams;
-  if (lowerQuery.includes('assignment') || lowerQuery.includes('homework')) return mockResponses.assignments;
-  if (lowerQuery.includes('food') || lowerQuery.includes('eat') || lowerQuery.includes('restaurant')) return mockResponses.food;
-  if (lowerQuery.includes('event')) return mockResponses.events;
-  if (lowerQuery.includes('form') || lowerQuery.includes('document')) return mockResponses.forms;
-  
-  if (lowerQuery.includes('remind')) {
-    return "I've set a reminder for you! You can view and manage all your reminders in the dashboard.";
+  // Student data related queries
+  if (lowerQuery.includes('student') && lowerQuery.includes('list')) {
+    const names = studentData.map(student => student.name).join(', ');
+    return `${randomGreeting} Here are the students in our database: ${names}`;
   }
   
-  return "I'm CampusCopilot, your AI assistant for college life! Ask me about exams, assignments, campus food, or set reminders for your tasks.";
+  if (lowerQuery.includes('course') || lowerQuery.includes('program')) {
+    const courses = [...new Set(studentData.map(student => student.course))];
+    return `${randomGreeting} The available courses are: ${courses.join(', ')}`;
+  }
+
+  // Regular queries with friendly responses
+  if (lowerQuery.includes('exam')) {
+    return `${randomGreeting} ${mockResponses.exams} Let me know if you need any study tips! 📚`;
+  }
+  
+  if (lowerQuery.includes('assignment') || lowerQuery.includes('homework')) {
+    return `${randomGreeting} ${mockResponses.assignments} Don't worry, you've got this! 💪`;
+  }
+  
+  if (lowerQuery.includes('food') || lowerQuery.includes('eat') || lowerQuery.includes('restaurant')) {
+    return `${randomGreeting} Feeling hungry? ${mockResponses.food} Enjoy your meal! 🍽️`;
+  }
+  
+  if (lowerQuery.includes('event')) {
+    return `${randomGreeting} Here's what's coming up! ${mockResponses.events} Hope to see you there! 🎉`;
+  }
+  
+  if (lowerQuery.includes('form') || lowerQuery.includes('document')) {
+    return `${randomGreeting} Need some paperwork done? ${mockResponses.forms} Let me know if you need help filling them out! 📝`;
+  }
+  
+  if (lowerQuery.includes('remind')) {
+    return `${randomGreeting} I've set a reminder for you! You can view and manage all your reminders in the dashboard. I'll make sure to notify you! ⏰`;
+  }
+
+  if (lowerQuery.includes('thank')) {
+    return "You're welcome! I'm always here to help! 😊";
+  }
+
+  if (lowerQuery.includes('bye') || lowerQuery.includes('goodbye')) {
+    return "Goodbye! Have a great day! Don't hesitate to come back if you need anything! 👋";
+  }
+  
+  return `${randomGreeting} I'm CampusCopilot, your friendly AI assistant for college life! 🎓 Ask me about students, courses, exams, assignments, campus food, or let me set reminders for your tasks!`;
 };
 
 export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { studentData } = useStudentData();
+  
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: uuidv4(),
@@ -77,16 +115,11 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const addAIResponse = useCallback(async (query: string) => {
-    // Add user message
     addMessage(query, 'user');
-    
-    // Simulate AI thinking
     await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Add AI response
-    const response = getResponse(query);
+    const response = getPersonalizedResponse(query, studentData);
     addMessage(response, 'ai');
-  }, [addMessage]);
+  }, [addMessage, studentData]);
 
   const addReminder = useCallback((title: string, description: string, dueDate: Date) => {
     setReminders(prev => [...prev, {
@@ -127,3 +160,5 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     </ChatContext.Provider>
   );
 };
+
+export default ChatProvider;
