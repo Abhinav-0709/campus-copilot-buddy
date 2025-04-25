@@ -2,9 +2,9 @@
 import { initializeApp } from 'firebase/app';
 import { getDatabase } from 'firebase/database';
 
-// Your Firebase configuration should have valid values from your Firebase project
+// Use import.meta.env instead of process.env for Vite projects
 const firebaseConfig = {
-  apiKey: process.env.FIREBASE_API_KEY || "AIzaSyDemoKeyForTesting123456",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDemoKeyForTesting123456",
   authDomain: "demo-project.firebaseapp.com",
   databaseURL: "https://demo-project-default-rtdb.firebaseio.com",
   projectId: "demo-project",
