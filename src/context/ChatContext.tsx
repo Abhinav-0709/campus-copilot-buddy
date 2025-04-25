@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useStudentData } from '@/hooks/useStudentData';
@@ -84,7 +85,7 @@ const getPersonalizedResponse = (query: string, studentData: any[]) => {
 };
 
 export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { studentData } = useStudentData();
+  const { studentData, error } = useStudentData();
   
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
