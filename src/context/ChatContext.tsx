@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useStudentData } from '@/hooks/useStudentData';
@@ -24,10 +23,34 @@ export const useChatContext = () => {
   return context;
 };
 
+interface MenuItem {
+  name: string;
+  price: number;
+  description: string;
+  category: 'snacks' | 'meals' | 'beverages' | 'desserts';
+}
+
+const menuItems: MenuItem[] = [
+  { name: 'Masala Dosa', price: 50, description: 'Crispy crepe with spiced potato filling', category: 'meals' },
+  { name: 'Samosa', price: 15, description: 'Crispy pastry with spiced potato filling', category: 'snacks' },
+  { name: 'Chai', price: 15, description: 'Indian spiced tea', category: 'beverages' },
+  { name: 'Vada Pav', price: 25, description: 'Spicy potato patty in a bun', category: 'snacks' },
+  { name: 'Fruit Bowl', price: 40, description: 'Fresh seasonal fruits', category: 'desserts' },
+  { name: 'Maggi Noodles', price: 30, description: 'Instant noodles with vegetables', category: 'meals' },
+  { name: 'Coffee', price: 20, description: 'Fresh brewed coffee', category: 'beverages' },
+  { name: 'Paratha', price: 35, description: 'Stuffed flatbread', category: 'meals' },
+  { name: 'Gulab Jamun', price: 20, description: 'Sweet milk-solid balls', category: 'desserts' },
+  { name: 'Poha', price: 30, description: 'Flattened rice with spices', category: 'meals' }
+];
+
 const mockResponses: Record<string, string> = {
   exams: "The next internal exams are scheduled for May 15-20, 2025. Make sure to check the department notice board for the exact schedule.",
   assignments: "You have 3 pending assignments:\n1. Data Structures project due tomorrow\n2. Economics essay due on Friday\n3. Physics lab report due next Monday",
-  food: "Here are some popular food spots near campus:\n• Campus Café - Coffee & sandwiches\n• Dosa Corner - Best South Indian food (try their masala dosa!)\n• Burger Bros - Quick bites\n• Veggie Delight - Healthy options",
+  food: `Here are some popular food spots near campus:
+• Campus Café - Budget-friendly meals (₹30-80)
+• Dosa Corner - South Indian specials (₹40-100)
+• Snack Shack - Quick bites (₹15-50)
+• Juice Junction - Fresh beverages (₹20-60)`,
   events: "Upcoming campus events:\n• Tech Fest - April 30\n• Cultural Night - May 5\n• Career Fair - May 10",
   forms: "Common forms you might need:\n• KYC verification\n• Scholarship application\n• Hostel extension\n• Internship certification"
 };
@@ -36,7 +59,45 @@ const getPersonalizedResponse = (query: string, studentData: any[]) => {
   const lowerQuery = query.toLowerCase();
   const greetings = ["Hi!", "Hello!", "Hey there!", "Greetings!", "Hi friend!"];
   const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
-  
+
+  // Budget-based food recommendations
+  if (lowerQuery.includes('rupees') || lowerQuery.includes('rs')) {
+    const budgetMatch = query.match(/(\d+)\s*(?:rupees|rs)/i);
+    if (budgetMatch) {
+      const budget = parseInt(budgetMatch[1]);
+      const affordableItems = menuItems.filter(item => item.price <= budget);
+      
+      if (affordableItems.length === 0) {
+        return `${randomGreeting} I'm sorry, but the minimum item in our menu starts from ₹15. You might want to check back when you have a bigger budget! 💰`;
+      }
+
+      const categorizedItems = affordableItems.reduce((acc: Record<string, MenuItem[]>, item) => {
+        acc[item.category] = [...(acc[item.category] || []), item];
+        return acc;
+      }, {});
+
+      let response = `${randomGreeting} With ₹${budget}, you can get these items:\n\n`;
+      
+      Object.entries(categorizedItems).forEach(([category, items]) => {
+        response += `${category.toUpperCase()}:\n`;
+        items.forEach(item => {
+          response += `• ${item.name} (₹${item.price}) - ${item.description}\n`;
+        });
+        response += '\n';
+      });
+
+      return response + "Enjoy your meal! 🍽️";
+    }
+  }
+
+  // Regular food query handling
+  if (lowerQuery.includes('food') || lowerQuery.includes('eat') || lowerQuery.includes('restaurant') || lowerQuery.includes('menu')) {
+    return `${randomGreeting}\n\n${mockResponses.food}\n\nOur Menu Highlights:\n${menuItems
+      .slice(0, 5)
+      .map(item => `• ${item.name} - ₹${item.price} (${item.description})`)
+      .join('\n')}\n\nYou can also ask me what you can get within your budget! 🍽️`;
+  }
+
   // Student data related queries
   if (lowerQuery.includes('student') && lowerQuery.includes('list')) {
     const names = studentData.map(student => student.name).join(', ');
@@ -55,10 +116,6 @@ const getPersonalizedResponse = (query: string, studentData: any[]) => {
   
   if (lowerQuery.includes('assignment') || lowerQuery.includes('homework')) {
     return `${randomGreeting} ${mockResponses.assignments} Don't worry, you've got this! 💪`;
-  }
-  
-  if (lowerQuery.includes('food') || lowerQuery.includes('eat') || lowerQuery.includes('restaurant')) {
-    return `${randomGreeting} Feeling hungry? ${mockResponses.food} Enjoy your meal! 🍽️`;
   }
   
   if (lowerQuery.includes('event')) {
