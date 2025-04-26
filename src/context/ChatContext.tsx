@@ -50,112 +50,96 @@ const mockResponses: Record<string, string> = {
   forms: "Common forms you might need:\n• KYC verification\n• Scholarship application\n• Hostel extension\n• Internship certification"
 };
 
+const getGeminiResponse = async (prompt: string): Promise<string> => {
+  try {
+    const { data, error } = await supabase.functions.invoke('gemini', {
+      body: { prompt }
+    });
+
+    if (error) throw error;
+    return data.response;
+  } catch (error) {
+    console.error('Error calling Gemini API:', error);
+    throw error;
+  }
+};
+
 const getPersonalizedResponse = async (query: string, studentData: any[]): Promise<string> => {
   const lowerQuery = query.toLowerCase();
   const greetings = ["Hi!", "Hello!", "Hey there!", "Greetings!", "Hi friend!"];
   const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
 
-  if (lowerQuery.includes('rupees') || lowerQuery.includes('rs')) {
-    const budgetMatch = query.match(/(\d+)\s*(?:rupees|rs)/i);
-    if (budgetMatch) {
-      const budget = parseInt(budgetMatch[1]);
-      
+  try {
+    // First try to handle specific commands with our existing logic
+    if (lowerQuery.includes('rupees') || lowerQuery.includes('rs')) {
+      const budgetMatch = query.match(/(\d+)\s*(?:rupees|rs)/i);
+      if (budgetMatch) {
+        const budget = parseInt(budgetMatch[1]);
+        
+        try {
+          const places = await fetchNearbyFoodPlaces(budget);
+          
+          if (places && places.length > 0) {
+            let response = `${randomGreeting} With a budget of ₹${budget}, here are some nearby places you can try:\n\n`;
+            
+            places.forEach(place => {
+              const priceRange = estimatePriceRange(place.priceLevel);
+              response += `• ${place.name} - ${priceRange}\n`;
+              response += `  ${place.address}\n`;
+              if (place.rating) response += `  Rating: ${place.rating}/5\n`;
+              response += `  ${place.isOpenNow ? '🟢 Open now' : '🔴 Closed'}\n\n`;
+            });
+            
+            response += "These recommendations are based on your location and budget. Enjoy your meal! 🍽️";
+            return response;
+          }
+          
+          return getFallbackFoodRecommendation(budget, randomGreeting);
+        } catch (error) {
+          console.error('Error fetching food places:', error);
+          return getFallbackFoodRecommendation(budget, randomGreeting);
+        }
+      }
+    }
+
+    if (lowerQuery.includes('food') || lowerQuery.includes('eat') || lowerQuery.includes('restaurant') || lowerQuery.includes('menu')) {
       try {
-        const places = await fetchNearbyFoodPlaces(budget);
+        const places = await fetchNearbyFoodPlaces(200, 'restaurant');
         
         if (places && places.length > 0) {
-          let response = `${randomGreeting} With a budget of ₹${budget}, here are some nearby places you can try:\n\n`;
+          let response = `${randomGreeting} Here are some food places near you:\n\n`;
           
           places.forEach(place => {
             const priceRange = estimatePriceRange(place.priceLevel);
             response += `• ${place.name} - ${priceRange}\n`;
             response += `  ${place.address}\n`;
-            if (place.rating) response += `  Rating: ${place.rating}/5\n`;
-            response += `  ${place.isOpenNow ? '🟢 Open now' : '🔴 Closed'}\n\n`;
+            if (place.rating) response += `  Rating: ${place.rating}/5\n\n`;
           });
           
-          response += "These recommendations are based on your location and budget. Enjoy your meal! 🍽️";
+          response += "\nYou can also ask me what's available within your budget! For example, 'What can I get for 100 rupees?' 🍽️";
           return response;
         }
         
-        return getFallbackFoodRecommendation(budget, randomGreeting);
+        return `${randomGreeting}\n\n${mockResponses.food}\n\nOur Menu Highlights:\n${menuItems
+          .slice(0, 5)
+          .map(item => `• ${item.name} - ₹${item.price} (${item.description})`)
+          .join('\n')}\n\nYou can also ask me what you can get within your budget! 🍽️`;
       } catch (error) {
         console.error('Error fetching food places:', error);
-        return getFallbackFoodRecommendation(budget, randomGreeting);
+        return `${randomGreeting}\n\n${mockResponses.food}\n\nOur Menu Highlights:\n${menuItems
+          .slice(0, 5)
+          .map(item => `• ${item.name} - ₹${item.price} (${item.description})`)
+          .join('\n')}\n\nYou can also ask me what you can get within your budget! 🍽️`;
       }
     }
-  }
 
-  if (lowerQuery.includes('food') || lowerQuery.includes('eat') || lowerQuery.includes('restaurant') || lowerQuery.includes('menu')) {
-    try {
-      const places = await fetchNearbyFoodPlaces(200, 'restaurant');
-      
-      if (places && places.length > 0) {
-        let response = `${randomGreeting} Here are some food places near you:\n\n`;
-        
-        places.forEach(place => {
-          const priceRange = estimatePriceRange(place.priceLevel);
-          response += `• ${place.name} - ${priceRange}\n`;
-          response += `  ${place.address}\n`;
-          if (place.rating) response += `  Rating: ${place.rating}/5\n\n`;
-        });
-        
-        response += "\nYou can also ask me what's available within your budget! For example, 'What can I get for 100 rupees?' 🍽️";
-        return response;
-      }
-      
-      return `${randomGreeting}\n\n${mockResponses.food}\n\nOur Menu Highlights:\n${menuItems
-        .slice(0, 5)
-        .map(item => `• ${item.name} - ₹${item.price} (${item.description})`)
-        .join('\n')}\n\nYou can also ask me what you can get within your budget! 🍽️`;
-    } catch (error) {
-      console.error('Error fetching food places:', error);
-      return `${randomGreeting}\n\n${mockResponses.food}\n\nOur Menu Highlights:\n${menuItems
-        .slice(0, 5)
-        .map(item => `• ${item.name} - ₹${item.price} (${item.description})`)
-        .join('\n')}\n\nYou can also ask me what you can get within your budget! 🍽️`;
-    }
+    // For all other queries, use Gemini
+    return await getGeminiResponse(query);
+    
+  } catch (error) {
+    console.error('Error getting response:', error);
+    return "I apologize, but I encountered an error processing your request. Please try again.";
   }
-
-  if (lowerQuery.includes('student') && lowerQuery.includes('list')) {
-    const names = studentData.map(student => student.name).join(', ');
-    return `${randomGreeting} Here are the students in our database: ${names}`;
-  }
-  
-  if (lowerQuery.includes('course') || lowerQuery.includes('program')) {
-    const courses = [...new Set(studentData.map(student => student.course))];
-    return `${randomGreeting} The available courses are: ${courses.join(', ')}`;
-  }
-
-  if (lowerQuery.includes('exam')) {
-    return `${randomGreeting} ${mockResponses.exams} Let me know if you need any study tips! 📚`;
-  }
-  
-  if (lowerQuery.includes('assignment') || lowerQuery.includes('homework')) {
-    return `${randomGreeting} ${mockResponses.assignments} Don't worry, you've got this! 💪`;
-  }
-  
-  if (lowerQuery.includes('event')) {
-    return `${randomGreeting} Here's what's coming up! ${mockResponses.events} Hope to see you there! 🎉`;
-  }
-  
-  if (lowerQuery.includes('form') || lowerQuery.includes('document')) {
-    return `${randomGreeting} Need some paperwork done? ${mockResponses.forms} Let me know if you need help filling them out! 📝`;
-  }
-  
-  if (lowerQuery.includes('remind')) {
-    return `${randomGreeting} I've set a reminder for you! You can view and manage all your reminders in the dashboard. I'll make sure to notify you! ⏰`;
-  }
-
-  if (lowerQuery.includes('thank')) {
-    return "You're welcome! I'm always here to help! 😊";
-  }
-
-  if (lowerQuery.includes('bye') || lowerQuery.includes('goodbye')) {
-    return "Goodbye! Have a great day! Don't hesitate to come back if you need anything! 👋";
-  }
-  
-  return `${randomGreeting} I'm CampusCopilot, your friendly AI assistant for college life! 🎓 Ask me about students, courses, exams, assignments, campus food, or let me set reminders for your tasks!`;
 };
 
 const getFallbackFoodRecommendation = (budget: number, greeting: string): string => {
