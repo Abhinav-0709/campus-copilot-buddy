@@ -1,9 +1,13 @@
+
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useStudentData } from '@/hooks/useStudentData';
 import type { ChatMessage, Reminder } from '@/types';
-import { fetchNearbyFoodPlaces, estimatePriceRange, FoodPlaceRecommendation } from '@/utils/placesApi';
+import { fetchNearbyFoodPlaces, estimatePriceRange, FoodPlaceRecommendation, createSupabaseClient } from '@/utils/placesApi';
 import { toast } from 'sonner';
+
+// Initialize the Supabase client
+const supabase = createSupabaseClient();
 
 interface ChatContextType {
   messages: ChatMessage[];
@@ -52,6 +56,11 @@ const mockResponses: Record<string, string> = {
 
 const getGeminiResponse = async (prompt: string): Promise<string> => {
   try {
+    if (!supabase) {
+      console.error('Supabase client is not initialized. Cannot call Gemini API.');
+      throw new Error('Supabase client not initialized');
+    }
+    
     const { data, error } = await supabase.functions.invoke('gemini', {
       body: { prompt }
     });
