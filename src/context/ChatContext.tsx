@@ -56,20 +56,26 @@ const mockResponses: Record<string, string> = {
 
 const getGeminiResponse = async (prompt: string): Promise<string> => {
   try {
+    // Check if Supabase client is available
     if (!supabase) {
       console.error('Supabase client is not initialized. Cannot call Gemini API.');
-      throw new Error('Supabase client not initialized');
+      // Return a fallback response instead of throwing error
+      return `I'm sorry, I can't connect to my AI service right now. Please check that you have set up your Supabase credentials in the environment variables.`;
     }
     
     const { data, error } = await supabase.functions.invoke('gemini', {
       body: { prompt }
     });
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error from Gemini API:', error);
+      throw error;
+    }
+    
     return data.response;
   } catch (error) {
     console.error('Error calling Gemini API:', error);
-    throw error;
+    return `I'm sorry, I encountered an error while processing your request. Please try again later or check if the Gemini API key is configured correctly.`;
   }
 };
 
@@ -142,8 +148,20 @@ const getPersonalizedResponse = async (query: string, studentData: any[]): Promi
       }
     }
 
-    // For all other queries, use Gemini
-    return await getGeminiResponse(query);
+    // For specific categories, use mock responses
+    for (const [key, response] of Object.entries(mockResponses)) {
+      if (lowerQuery.includes(key)) {
+        return `${randomGreeting}\n\n${response}`;
+      }
+    }
+
+    // For all other queries, try to use Gemini
+    try {
+      return await getGeminiResponse(query);
+    } catch (error) {
+      console.error('Error getting Gemini response:', error);
+      return `${randomGreeting}\n\nI'm still learning to answer that type of question. Could you try asking something about campus life, food options, exams, or assignments?`;
+    }
     
   } catch (error) {
     console.error('Error getting response:', error);
