@@ -2,9 +2,21 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Initialize the Supabase client
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Get the URL and key from environment variables, or use empty strings as fallbacks
+// to prevent the immediate error, then handle the missing values gracefully
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+
+// Create the Supabase client only if we have valid credentials
+const createSupabaseClient = () => {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.error('Missing Supabase credentials. Make sure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set.');
+    return null;
+  }
+  return createClient(supabaseUrl, supabaseAnonKey);
+};
+
+const supabase = createSupabaseClient();
 
 interface PlaceResult {
   name: string;
@@ -72,6 +84,12 @@ export const fetchNearbyFoodPlaces = async (
   keyword: string = 'food'
 ): Promise<FoodPlaceRecommendation[]> => {
   try {
+    // Check if Supabase client is available
+    if (!supabase) {
+      console.error('Supabase client is not initialized. Cannot fetch places.');
+      return [];
+    }
+
     // Convert budget to price level (0-4)
     const maxPriceLevel = budgetToPriceLevel(budget);
     
