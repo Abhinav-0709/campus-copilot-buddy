@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useStudentData } from '@/hooks/useStudentData';
 import type { ChatMessage, Reminder } from '@/types';
+import { fetchNearbyFoodPlaces, estimatePriceRange, FoodPlaceRecommendation } from '@/utils/placesApi';
+import { toast } from 'sonner';
 
 interface ChatContextType {
   messages: ChatMessage[];
@@ -23,14 +25,7 @@ export const useChatContext = () => {
   return context;
 };
 
-interface MenuItem {
-  name: string;
-  price: number;
-  description: string;
-  category: 'snacks' | 'meals' | 'beverages' | 'desserts';
-}
-
-const menuItems: MenuItem[] = [
+const menuItems = [
   { name: 'Masala Dosa', price: 50, description: 'Crispy crepe with spiced potato filling', category: 'meals' },
   { name: 'Samosa', price: 15, description: 'Crispy pastry with spiced potato filling', category: 'snacks' },
   { name: 'Chai', price: 15, description: 'Indian spiced tea', category: 'beverages' },
@@ -55,50 +50,73 @@ const mockResponses: Record<string, string> = {
   forms: "Common forms you might need:\n• KYC verification\n• Scholarship application\n• Hostel extension\n• Internship certification"
 };
 
-const getPersonalizedResponse = (query: string, studentData: any[]) => {
+const getPersonalizedResponse = async (query: string, studentData: any[]): Promise<string> => {
   const lowerQuery = query.toLowerCase();
   const greetings = ["Hi!", "Hello!", "Hey there!", "Greetings!", "Hi friend!"];
   const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
 
-  // Budget-based food recommendations
   if (lowerQuery.includes('rupees') || lowerQuery.includes('rs')) {
     const budgetMatch = query.match(/(\d+)\s*(?:rupees|rs)/i);
     if (budgetMatch) {
       const budget = parseInt(budgetMatch[1]);
-      const affordableItems = menuItems.filter(item => item.price <= budget);
       
-      if (affordableItems.length === 0) {
-        return `${randomGreeting} I'm sorry, but the minimum item in our menu starts from ₹15. You might want to check back when you have a bigger budget! 💰`;
+      try {
+        const places = await fetchNearbyFoodPlaces(budget);
+        
+        if (places && places.length > 0) {
+          let response = `${randomGreeting} With a budget of ₹${budget}, here are some nearby places you can try:\n\n`;
+          
+          places.forEach(place => {
+            const priceRange = estimatePriceRange(place.priceLevel);
+            response += `• ${place.name} - ${priceRange}\n`;
+            response += `  ${place.address}\n`;
+            if (place.rating) response += `  Rating: ${place.rating}/5\n`;
+            response += `  ${place.isOpenNow ? '🟢 Open now' : '🔴 Closed'}\n\n`;
+          });
+          
+          response += "These recommendations are based on your location and budget. Enjoy your meal! 🍽️";
+          return response;
+        }
+        
+        return getFallbackFoodRecommendation(budget, randomGreeting);
+      } catch (error) {
+        console.error('Error fetching food places:', error);
+        return getFallbackFoodRecommendation(budget, randomGreeting);
       }
-
-      const categorizedItems = affordableItems.reduce((acc: Record<string, MenuItem[]>, item) => {
-        acc[item.category] = [...(acc[item.category] || []), item];
-        return acc;
-      }, {});
-
-      let response = `${randomGreeting} With ₹${budget}, you can get these items:\n\n`;
-      
-      Object.entries(categorizedItems).forEach(([category, items]) => {
-        response += `${category.toUpperCase()}:\n`;
-        items.forEach(item => {
-          response += `• ${item.name} (₹${item.price}) - ${item.description}\n`;
-        });
-        response += '\n';
-      });
-
-      return response + "Enjoy your meal! 🍽️";
     }
   }
 
-  // Regular food query handling
   if (lowerQuery.includes('food') || lowerQuery.includes('eat') || lowerQuery.includes('restaurant') || lowerQuery.includes('menu')) {
-    return `${randomGreeting}\n\n${mockResponses.food}\n\nOur Menu Highlights:\n${menuItems
-      .slice(0, 5)
-      .map(item => `• ${item.name} - ₹${item.price} (${item.description})`)
-      .join('\n')}\n\nYou can also ask me what you can get within your budget! 🍽️`;
+    try {
+      const places = await fetchNearbyFoodPlaces(200, 'restaurant');
+      
+      if (places && places.length > 0) {
+        let response = `${randomGreeting} Here are some food places near you:\n\n`;
+        
+        places.forEach(place => {
+          const priceRange = estimatePriceRange(place.priceLevel);
+          response += `• ${place.name} - ${priceRange}\n`;
+          response += `  ${place.address}\n`;
+          if (place.rating) response += `  Rating: ${place.rating}/5\n\n`;
+        });
+        
+        response += "\nYou can also ask me what's available within your budget! For example, 'What can I get for 100 rupees?' 🍽️";
+        return response;
+      }
+      
+      return `${randomGreeting}\n\n${mockResponses.food}\n\nOur Menu Highlights:\n${menuItems
+        .slice(0, 5)
+        .map(item => `• ${item.name} - ₹${item.price} (${item.description})`)
+        .join('\n')}\n\nYou can also ask me what you can get within your budget! 🍽️`;
+    } catch (error) {
+      console.error('Error fetching food places:', error);
+      return `${randomGreeting}\n\n${mockResponses.food}\n\nOur Menu Highlights:\n${menuItems
+        .slice(0, 5)
+        .map(item => `• ${item.name} - ₹${item.price} (${item.description})`)
+        .join('\n')}\n\nYou can also ask me what you can get within your budget! 🍽️`;
+    }
   }
 
-  // Student data related queries
   if (lowerQuery.includes('student') && lowerQuery.includes('list')) {
     const names = studentData.map(student => student.name).join(', ');
     return `${randomGreeting} Here are the students in our database: ${names}`;
@@ -109,7 +127,6 @@ const getPersonalizedResponse = (query: string, studentData: any[]) => {
     return `${randomGreeting} The available courses are: ${courses.join(', ')}`;
   }
 
-  // Regular queries with friendly responses
   if (lowerQuery.includes('exam')) {
     return `${randomGreeting} ${mockResponses.exams} Let me know if you need any study tips! 📚`;
   }
@@ -139,6 +156,31 @@ const getPersonalizedResponse = (query: string, studentData: any[]) => {
   }
   
   return `${randomGreeting} I'm CampusCopilot, your friendly AI assistant for college life! 🎓 Ask me about students, courses, exams, assignments, campus food, or let me set reminders for your tasks!`;
+};
+
+const getFallbackFoodRecommendation = (budget: number, greeting: string): string => {
+  const affordableItems = menuItems.filter(item => item.price <= budget);
+  
+  if (affordableItems.length === 0) {
+    return `${greeting} I'm sorry, but the minimum item in our menu starts from ₹15. You might want to check back when you have a bigger budget! 💰`;
+  }
+
+  const categorizedItems = affordableItems.reduce((acc: Record<string, typeof menuItems>, item) => {
+    acc[item.category] = [...(acc[item.category] || []), item];
+    return acc;
+  }, {});
+
+  let response = `${greeting} With ₹${budget}, you can get these items from our menu:\n\n`;
+  
+  Object.entries(categorizedItems).forEach(([category, items]) => {
+    response += `${category.toUpperCase()}:\n`;
+    items.forEach(item => {
+      response += `• ${item.name} (₹${item.price}) - ${item.description}\n`;
+    });
+    response += '\n';
+  });
+
+  return response + "Enjoy your meal! 🍽️\n\n(This is showing our campus menu as I couldn't connect to the location service)";
 };
 
 export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -174,9 +216,33 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const addAIResponse = useCallback(async (query: string) => {
     addMessage(query, 'user');
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    const response = getPersonalizedResponse(query, studentData);
-    addMessage(response, 'ai');
+    
+    const loadingMessageId = uuidv4();
+    setMessages(prev => [...prev, {
+      id: loadingMessageId,
+      content: "Thinking...",
+      type: 'ai',
+      timestamp: new Date()
+    }]);
+    
+    try {
+      const response = await getPersonalizedResponse(query, studentData);
+      
+      setMessages(prev => prev.map(msg => 
+        msg.id === loadingMessageId 
+          ? { ...msg, content: response }
+          : msg
+      ));
+    } catch (error) {
+      console.error("Error getting AI response:", error);
+      toast.error("Sorry, I had trouble processing your request.");
+      
+      setMessages(prev => prev.map(msg => 
+        msg.id === loadingMessageId 
+          ? { ...msg, content: "Sorry, I encountered an error. Please try again." }
+          : msg
+      ));
+    }
   }, [addMessage, studentData]);
 
   const addReminder = useCallback((title: string, description: string, dueDate: Date) => {

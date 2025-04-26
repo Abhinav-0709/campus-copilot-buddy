@@ -2,7 +2,7 @@
 import React from 'react';
 import { useChatContext } from '@/context/ChatContext';
 import { Button } from '@/components/ui/button';
-import { Calendar, BookOpen, Coffee, FileText, CalendarClock } from 'lucide-react';
+import { Calendar, BookOpen, Coffee, FileText, CalendarClock, DollarSign } from 'lucide-react';
 
 const quickActions = [
   {
@@ -34,6 +34,12 @@ const quickActions = [
     label: 'Events',
     prompt: 'What events are happening soon?',
     icon: <CalendarClock className="h-4 w-4" />
+  },
+  {
+    id: 'budget',
+    label: 'Food Budget',
+    prompt: 'What can I eat for 100 rupees?',
+    icon: <DollarSign className="h-4 w-4" />
   }
 ];
 
